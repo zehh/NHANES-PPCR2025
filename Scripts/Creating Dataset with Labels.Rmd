@@ -53,68 +53,100 @@ df <- reduce(data_list, full_join, by = "SEQN")
 
 ## Selecting variables of interest
 
-For this analysis, we selected a subset of variables based on our research question and potential confounders.  
-This reduces the size of the dataset and keeps only the relevant information.
+For this analysis, we prepared two distinct sets of variables:
 
-The list of variables is stored in a single object, making it easy to update if future analyses require additional variables.
+1. **Default variable set:**  
+   Includes only the primary exposure, outcome, and essential covariates directly related to our main research question. This reduces the size of the dataset and focuses on the core variables needed for the primary analysis.
+
+2. **Fregni + students variable set:**  
+   A broader list that combines variables suggested by the students with additional variables outlined by Professor Fregni in [this document](https://docs.google.com/spreadsheets/d/1R2-H-GNjgzqN-QrE5ATa5aSI6Wi5duCdthr5S92D6WY/edit?gid=1983944501#gid=1983944501).
+
+To keep the code flexible and maintainable, each list of variables is stored in an external text file. This makes it easy to update or expand the analysis in the future without modifying the underlying R code—new variables can simply be added to the corresponding text file.
+
+The script then reads these lists, selects the relevant columns from the merged dataset, and checks that all requested variables are present. If any variables are missing, it issues a warning indicating which ones are absent so that they can be reviewed and addressed.
 
 ```{r selecting variables}
 
-# Define variables of interest
-# If you want to add variables in the future, add them here
-vars_to_keep <- c(
-  "SEQN",       # key
-  "DRQSDT1",    
-  "LBXHSCRP",
-  "LBDHRPLC",
-  "RIDAGEYR",   
-  "RIAGENDR",
-  "RIDRETH1",
-  "BMXBMI",
-  "SMQ020",
-  "PAQ605",
-  "PAQ650",
-  "SLD012"
-)
 
-# Select only these columns from the merged dataset
-df <- df %>% select(any_of(vars_to_keep))
+# -----------------------------
+# Function to select variables and check for missing ones
+# -----------------------------
+# - Takes a dataset and a vector of variables to keep
+# - Warns if any requested variables are missing from the dataset
+# - Returns the dataset with only the selected variables
+select_and_check <- function(data, vars_to_keep, label = NULL) {
+  selected_data <- data %>% select(any_of(vars_to_keep))
 
-# Find which variables are missing
-missing_vars <- setdiff(vars_to_keep, names(df))
+  # Check for missing variables
+  missing_vars <- setdiff(vars_to_keep, names(selected_data))
+  if (length(missing_vars) > 0) {
+    warning(
+      "The following variables are missing",
+      if (!is.null(label)) paste0(" in ", label) else "",
+      ":\n",
+      paste(missing_vars, collapse = ", "),
+      "\n\nPlease check that the variable names are correct or that the appropriate NHANES datasets have been downloaded and placed in the Input folder."
+    )
+  }
 
-# If any variables are missing, print a warning
-if (length(missing_vars) > 0) {
-  warning(
-    "The following variables are missing from the final dataset:\n",
-    paste(missing_vars, collapse = ", "),
-    "\n\nPlease check that the variable names are correct or that the appropriate NHANES datasets containing these variables have been downloaded and placed in the Input folder."
-  )
+  return(selected_data)
 }
 
-rm(missing_vars)
+# -----------------------------
+# Read in the lists of variables from external text files
+# -----------------------------
+# The first list contains only the main variables of interest
+vars_to_keep <- read_lines(here("Input", "variable_list.txt"))
+
+# The second list contains the variables suggested by the students plus 
+# those defined by Professor Fregni in his document
+vars_to_keep_fregni_plus_students_suggestions <- read_lines(here("Input", "variable_list_fregni_plus_students.txt"))
+
+# -----------------------------
+# Create datasets with only the selected variables
+# -----------------------------
+df_selected <- select_and_check(df, vars_to_keep, label = "default variable set")
+df_fregni_plus_students <- select_and_check(df, vars_to_keep_fregni_plus_students_suggestions, label = "Fregni + students variable set")
 
 ```
 
-## Exporting the final dataset
+## Exporting the final datasets
 
-The final merged dataset was saved in three formats to facilitate future analyses:
+Two sets of final merged datasets were created based on different lists of variables:
 
-* An Excel spreadsheet (`.xlsx`), which is convenient for manual inspection.
+1. **Default variable set** — containing only the main exposure, outcome, and essential covariates as initially defined by the group.
+2. **Fregni + students variable set** — a broader set including all variables proposed by Professor Fregni in his document, plus additional suggestions made by the students.
+
+Each dataset was saved in three formats to facilitate different types of analyses:
+
+* An Excel spreadsheet (`.xlsx`), which is convenient for manual inspection or sharing.
 * A Stata file (`.dta`), allowing compatibility with Stata-based workflows.
-* An R serialized file (`.rds`), which preserves the data types and is efficient for loading directly into R.
+* An R serialized file (`.rds`), which preserves data types and is efficient for direct loading into R.
 
-All output files were written to the `Output` subfolder of the project directory.
+All output files were written to the `Output` subfolder of the project directory.  
+The files follow a clear naming convention:
+
+- `merged_dataset.*` for the default variable set.
+- `merged_dataset_fregni_plus_students.*` for the expanded variable set.
+
 
 ```{r writing the output}
-# Write as .xlsx
-write_xlsx(df, here("Output", "merged_dataset.xlsx"))
 
-# Write as .dta (Stata)
-write_dta(df, here("Output", "merged_dataset.dta"))
+# This function takes a dataset and a base name,
+# and writes it as .xlsx, .dta, and .rds files
+# into the Output folder.
+write_outputs <- function(data, base_name) {
+  write_xlsx(data, here("Output", paste0(base_name, ".xlsx")))
+  write_dta(data, here("Output", paste0(base_name, ".dta")))
+  write_rds(data, here("Output", paste0(base_name, ".rds")))
+}
 
-# Write as .rds (R)
-write_rds(df, here("Output", "merged_dataset.rds"))
+# Write the default dataset outputs
+write_outputs(df_selected, "merged_dataset")
+
+# Write the extended dataset (Fregni + students) outputs
+write_outputs(df_fregni_plus_students, "merged_dataset_fregni_plus_students")
+
 ```
 
 ## Notes

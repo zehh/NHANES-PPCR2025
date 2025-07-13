@@ -364,13 +364,10 @@ available in the <a href="https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/defa
 2017-2018</a> website for usage in conducting the analysis in the PPCR
 2025 Data Project by group 7.</p>
 <p>All processes were done using R version 4.1</p>
-<pre class="r"><code>library(here)</code></pre>
-<pre><code>## Warning: package &#39;here&#39; was built under R version 4.4.3</code></pre>
-<pre class="r"><code>library(tidyverse)
-library(haven)</code></pre>
-<pre><code>## Warning: package &#39;haven&#39; was built under R version 4.4.3</code></pre>
-<pre class="r"><code>library(writexl)</code></pre>
-<pre><code>## Warning: package &#39;writexl&#39; was built under R version 4.4.3</code></pre>
+<pre class="r"><code>library(here)
+library(tidyverse)
+library(haven)
+library(writexl)</code></pre>
 </div>
 <div id="reading-in-the-data" class="section level2">
 <h2>Reading in the data</h2>
@@ -383,7 +380,9 @@ and read them into R as data frames. This approach ensures that any new
 <code>.xpt</code> files added to the folder in the future will
 automatically be included.</p>
 <pre class="r"><code># list all .xpt files inside the &quot;Input&quot; subfolder
-# If, in the future, you want to add more variables, download the .xpt file and add them in the Input folder
+# If, in the future, you want to add more variables,
+# download the .xpt file and add them in the Input folder
+
 files &lt;- list.files(here(&quot;Input&quot;), pattern = &quot;\\.xpt$&quot;, full.names = TRUE)
 
 # read each .xpt file into a list of data frames
@@ -403,70 +402,110 @@ df &lt;- reduce(data_list, full_join, by = &quot;SEQN&quot;)</code></pre>
 </div>
 <div id="selecting-variables-of-interest" class="section level2">
 <h2>Selecting variables of interest</h2>
-<p>For this analysis, we selected a subset of variables based on our
-research question and potential confounders.<br />
-This reduces the size of the dataset and keeps only the relevant
-information.</p>
-<p>The list of variables is stored in a single object, making it easy to
-update if future analyses require additional variables.</p>
-<pre class="r"><code># Define variables of interest
-# If you want to add variables in the future, add them here
-vars_to_keep &lt;- c(
-  &quot;SEQN&quot;,       # key
-  &quot;DRQSDT1&quot;,    # Main exposure
-  &quot;HSCRP_J&quot;,    # Main outcome
-  &quot;RIDAGEYR&quot;,   # Covariates
-  &quot;RIAGENDR&quot;,
-  &quot;RIDRETH1&quot;,
-  &quot;BMXBMI&quot;,
-  &quot;SMQ020&quot;,
-  &quot;PAQ605&quot;,
-  &quot;PAQ650&quot;,
-  &quot;SLD012&quot;
-)
+<p>For this analysis, we prepared two distinct sets of variables:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>Default variable set:</strong><br />
+Includes only the primary exposure, outcome, and essential covariates
+directly related to our main research question. This reduces the size of
+the dataset and focuses on the core variables needed for the primary
+analysis.</p></li>
+<li><p><strong>Fregni + students variable set:</strong><br />
+A broader list that combines variables suggested by the students with
+additional variables outlined by Professor Fregni in <a href="https://docs.google.com/spreadsheets/d/1R2-H-GNjgzqN-QrE5ATa5aSI6Wi5duCdthr5S92D6WY/edit?gid=1983944501#gid=1983944501">this
+document</a>.</p></li>
+</ol>
+<p>To keep the code flexible and maintainable, each list of variables is
+stored in an external text file. This makes it easy to update or expand
+the analysis in the future without modifying the underlying R code—new
+variables can simply be added to the corresponding text file.</p>
+<p>The script then reads these lists, selects the relevant columns from
+the merged dataset, and checks that all requested variables are present.
+If any variables are missing, it issues a warning indicating which ones
+are absent so that they can be reviewed and addressed.</p>
+<pre class="r"><code># -----------------------------
+# Function to select variables and check for missing ones
+# -----------------------------
+# - Takes a dataset and a vector of variables to keep
+# - Warns if any requested variables are missing from the dataset
+# - Returns the dataset with only the selected variables
+select_and_check &lt;- function(data, vars_to_keep, label = NULL) {
+  selected_data &lt;- data %&gt;% select(any_of(vars_to_keep))
 
-# Select only these columns from the merged dataset
-df &lt;- df %&gt;% select(any_of(vars_to_keep))
+  # Check for missing variables
+  missing_vars &lt;- setdiff(vars_to_keep, names(selected_data))
+  if (length(missing_vars) &gt; 0) {
+    warning(
+      &quot;The following variables are missing&quot;,
+      if (!is.null(label)) paste0(&quot; in &quot;, label) else &quot;&quot;,
+      &quot;:\n&quot;,
+      paste(missing_vars, collapse = &quot;, &quot;),
+      &quot;\n\nPlease check that the variable names are correct or that the appropriate NHANES datasets have been downloaded and placed in the Input folder.&quot;
+    )
+  }
 
-# Find which variables are missing
-missing_vars &lt;- setdiff(vars_to_keep, names(df))
+  return(selected_data)
+}
 
-# If any variables are missing, print a warning
-if (length(missing_vars) &gt; 0) {
-  warning(
-    &quot;The following variables are missing from the final dataset:\n&quot;,
-    paste(missing_vars, collapse = &quot;, &quot;),
-    &quot;\n\nPlease check that the variable names are correct or that the appropriate NHANES datasets containing these variables have been downloaded and placed in the Input folder.&quot;
-  )
-}</code></pre>
-<pre><code>## Warning: The following variables are missing from the final dataset:
-## HSCRP_J, SMQ020, PAQ605, PAQ650, SLD012
-## 
-## Please check that the variable names are correct or that the appropriate NHANES datasets containing these variables have been downloaded and placed in the Input folder.</code></pre>
-<pre class="r"><code>rm(missing_vars)</code></pre>
+# -----------------------------
+# Read in the lists of variables from external text files
+# -----------------------------
+# The first list contains only the main variables of interest
+vars_to_keep &lt;- read_lines(here(&quot;Input&quot;, &quot;variable_list.txt&quot;))
+
+# The second list contains the variables suggested by the students plus 
+# those defined by Professor Fregni in his document
+vars_to_keep_fregni_plus_students_suggestions &lt;- read_lines(here(&quot;Input&quot;, &quot;variable_list_fregni_plus_students.txt&quot;))
+
+# -----------------------------
+# Create datasets with only the selected variables
+# -----------------------------
+df_selected &lt;- select_and_check(df, vars_to_keep, label = &quot;default variable set&quot;)
+df_fregni_plus_students &lt;- select_and_check(df, vars_to_keep_fregni_plus_students_suggestions, label = &quot;Fregni + students variable set&quot;)</code></pre>
 </div>
-<div id="exporting-the-final-dataset" class="section level2">
-<h2>Exporting the final dataset</h2>
-<p>The final merged dataset was saved in three formats to facilitate
-future analyses:</p>
+<div id="exporting-the-final-datasets" class="section level2">
+<h2>Exporting the final datasets</h2>
+<p>Two sets of final merged datasets were created based on different
+lists of variables:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Default variable set</strong> — containing only the main
+exposure, outcome, and essential covariates as initially defined by the
+group.</li>
+<li><strong>Fregni + students variable set</strong> — a broader set
+including all variables proposed by Professor Fregni in his document,
+plus additional suggestions made by the students.</li>
+</ol>
+<p>Each dataset was saved in three formats to facilitate different types
+of analyses:</p>
 <ul>
 <li>An Excel spreadsheet (<code>.xlsx</code>), which is convenient for
-manual inspection.</li>
+manual inspection or sharing.</li>
 <li>A Stata file (<code>.dta</code>), allowing compatibility with
 Stata-based workflows.</li>
-<li>An R serialized file (<code>.rds</code>), which preserves the data
-types and is efficient for loading directly into R.</li>
+<li>An R serialized file (<code>.rds</code>), which preserves data types
+and is efficient for direct loading into R.</li>
 </ul>
 <p>All output files were written to the <code>Output</code> subfolder of
-the project directory.</p>
-<pre class="r"><code># Write as .xlsx
-write_xlsx(df, here(&quot;Output&quot;, &quot;merged_dataset.xlsx&quot;))
+the project directory.<br />
+The files follow a clear naming convention:</p>
+<ul>
+<li><code>merged_dataset.*</code> for the default variable set.</li>
+<li><code>merged_dataset_fregni_plus_students.*</code> for the expanded
+variable set.</li>
+</ul>
+<pre class="r"><code># This function takes a dataset and a base name,
+# and writes it as .xlsx, .dta, and .rds files
+# into the Output folder.
+write_outputs &lt;- function(data, base_name) {
+  write_xlsx(data, here(&quot;Output&quot;, paste0(base_name, &quot;.xlsx&quot;)))
+  write_dta(data, here(&quot;Output&quot;, paste0(base_name, &quot;.dta&quot;)))
+  write_rds(data, here(&quot;Output&quot;, paste0(base_name, &quot;.rds&quot;)))
+}
 
-# Write as .dta (Stata)
-write_dta(df, here(&quot;Output&quot;, &quot;merged_dataset.dta&quot;))
+# Write the default dataset outputs
+write_outputs(df_selected, &quot;merged_dataset&quot;)
 
-# Write as .rds (R)
-write_rds(df, here(&quot;Output&quot;, &quot;merged_dataset.rds&quot;))</code></pre>
+# Write the extended dataset (Fregni + students) outputs
+write_outputs(df_fregni_plus_students, &quot;merged_dataset_fregni_plus_students&quot;)</code></pre>
 </div>
 <div id="notes" class="section level2">
 <h2>Notes</h2>
