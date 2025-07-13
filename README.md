@@ -46,6 +46,22 @@ Open `Scripts/Creating Dataset with Labels.Rmd` in RStudio and run all chunks or
 - Select only the variables listed in `vars_to_keep`,
 - Write the final dataset to the `Output/` folder in `.xlsx`, `.dta`, and `.rds` formats.
 
+## 📊 How to read the dataset into Stata
+
+The final merged dataset is exported as a Stata `.dta` file in the `Output/` folder.
+
+To load it in Stata, open Stata and run:
+
+```stata
+use "Output/merged_dataset.dta", clear
+```
+
+Make sure your working directory in Stata is set to the project root, or provide the full path to the file instead.
+
+---
+
+✅ That’s it — you can now perform your analyses directly in Stata with all selected NHANES variables already merged and labeled.
+
 ---
 
 ## 🔗 Resources
