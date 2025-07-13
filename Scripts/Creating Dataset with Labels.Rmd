@@ -3,8 +3,8 @@ title: "Creating Dataset with Labels"
 author: "Pedro Henrique Brant"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ## Introduction
