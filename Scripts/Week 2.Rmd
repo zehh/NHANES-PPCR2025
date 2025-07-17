@@ -1,0 +1,137 @@
+---
+title: "Week 2"
+author: "Pedro Henrique Brant"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+library(janitor)
+library(patchwork)
+library(rlang)
+library(e1071)
+```
+
+```{r reading-in-data}
+
+df <- readRDS(here("Output", "merged_dataset_fregni_plus_students.rds")) %>%
+  clean_names()
+
+```
+
+```{r defining-function-for-outcome-variable-description}
+
+explore_continuous_var <- function(data, var) {
+  var_sym <- ensym(var)
+  var_name <- as_string(var_sym)
+  
+  # Extract variable and compute basic quantities
+  x <- data %>% pull({{ var }})
+  x_non_na <- na.omit(x)
+  n_total <- length(x)
+  n_missing <- sum(is.na(x))
+  missing_pct <- round(n_missing / n_total * 100, 2)
+
+  # Compute stats
+  stats_list <- list(
+    variable = var_name,
+    n = n_total,
+    n_missing = n_missing,
+    missing_pct = missing_pct,
+    min = min(x, na.rm = TRUE),
+    `25%` = quantile(x, 0.25, na.rm = TRUE),
+    median = median(x, na.rm = TRUE),
+    `75%` = quantile(x, 0.75, na.rm = TRUE),
+    max = max(x, na.rm = TRUE),
+    IQR = IQR(x, na.rm = TRUE),
+    mean = mean(x, na.rm = TRUE),
+    SD = sd(x, na.rm = TRUE),
+    skewness = skewness(x_non_na, na.rm = TRUE),
+    kurtosis = kurtosis(x_non_na, na.rm = TRUE)
+  )
+
+  # Convert to tibble with two columns
+  summary_tbl <- tibble(
+    statistic = names(stats_list),
+    value = unlist(stats_list)
+  )
+
+  # Plotting tibble
+  df_plot <- tibble(x = x)
+
+  # Plot 1: Density
+  density_plot <- ggplot(df_plot, aes(x = x)) +
+    geom_density(fill = "lightblue", alpha = 0.5, na.rm = TRUE) +
+    geom_vline(xintercept = median(x_non_na), color = "blue", linetype = "dashed") +
+    geom_vline(xintercept = mean(x_non_na), color = "red", linetype = "dashed") +
+    annotate("text", x = median(x_non_na), y = Inf,
+             label = paste0("Median: ", round(median(x_non_na), 2)),
+             vjust = -0.5, hjust = 0, color = "blue", size = 3) +
+    annotate("text", x = mean(x_non_na), y = Inf,
+             label = paste0("Mean: ", round(mean(x_non_na), 2)),
+             vjust = -1.5, hjust = 0, color = "red", size = 3) +
+    labs(title = "Density Plot", x = var_name, y = "Density") +
+    theme_minimal()
+
+  # Plot 2: Histogram
+  hist_plot <- ggplot(df_plot, aes(x = x)) +
+    geom_histogram(bins = 30, fill = "gray80", color = "black", na.rm = TRUE) +
+    labs(title = "Histogram", x = var_name, y = "Count") +
+    theme_minimal()
+
+  # Plot 3: Q-Q
+  qq_plot <- ggplot(tibble(x = x_non_na), aes(sample = x)) +
+    stat_qq() +
+    stat_qq_line(color = "red") +
+    labs(
+      title = "Q-Q Plot",
+      subtitle = paste("n =", length(x_non_na)),
+      x = "Theoretical Quantiles",
+      y = "Sample Quantiles"
+    ) +
+    theme_minimal()
+
+  # Plot 4: Boxplot
+  box_plot <- ggplot(df_plot, aes(y = x)) +
+    geom_boxplot(fill = "lightgreen", na.rm = TRUE) +
+    coord_flip() +
+    labs(title = "Boxplot", y = var_name) +
+    theme_minimal()
+
+  # Combine all 4 plots
+  combined_plot <- (density_plot | hist_plot) / (qq_plot | box_plot)
+
+  return(list(summary = summary_tbl, plot = combined_plot))
+}
+
+
+```
+
+```{r using-the-function}
+
+biomarker_vars <- c(
+  hs_crp    = "lbxhscrp",
+  insulin   = "lbxin",
+  glucose   = "lbxglu",
+  ferritin  = "lbxfer",
+  tg        = "lbxtr",
+  hdl       = "lbdhdd",
+  ldl       = "lbdldl",
+  total_chol = "lbxtc",
+  hba1c     = "lbxgh",
+  neutrophil_count = "lbdneno",
+  lymphocyte_count = "lbdlymno"
+)
+
+
+results <- imap(biomarker_vars, function(varname, label) {
+  cat("Exploring", label, "(", varname, ")...\n")
+  result <- explore_continuous_var(df, varname)
+  list(name = label, varname = varname, result = result)
+})
+
+results
+
+```
