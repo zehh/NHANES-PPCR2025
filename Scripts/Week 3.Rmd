@@ -346,7 +346,7 @@ ggsave(
 ggsave(
   filename = here::here("Output", "Week3", "upset_plot.png"),
   plot     = upset_plot,
-  width    = 10, height = 6, dpi = 300
+  width    = 16, height = 6, dpi = 300
 )
 
 gtsave(
