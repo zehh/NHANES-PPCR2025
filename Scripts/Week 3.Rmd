@@ -252,7 +252,7 @@ final_tbl <- bind_rows(yes_row, yes_diets, others)
 
 # 6) Render with gt and style the bullets
 # Create gt table with proper header, alignment, and styling
-final_tbl %>%
+final_tbl <- final_tbl %>%
   gt(rowname_col = "label") %>%
   tab_stubhead(label = "Following a diet?") %>%
   tab_header(title = "Absolute and relative frequencies of specific diets") %>%
@@ -270,6 +270,8 @@ final_tbl %>%
       rows = startsWith(final_tbl$label, "• ")
     )
   )
+
+final_tbl
 
 ```
 
@@ -314,7 +316,7 @@ upset_data_pub <- upset_data %>%
 specific_diets_pub <- unname(diet_labels[specific_diets])  # vector of publication-ready names
 
 # 4. UpSet plot using *only* the correct columns as sets
-upset(
+upset_plot <- upset(
   upset_data_pub,
   specific_diets_pub,
   name = "Specific Diets",
@@ -327,8 +329,35 @@ upset(
   ) +
   ggtitle("Overlap of Specific Diet Types Among Dieting Participants")
 
-
+upset_plot
 ```
 
 
 This plot shows the most common individual diets on the left, and the set intersections (i.e. combinations of diets) along the bottom, with bar heights indicating the number of participants in each intersection.
+
+```{r exporting}
+
+ggsave(
+  filename = here::here("Output", "Week3", "barplot_gen_variable.png"),
+  plot     = barplot_gen_variable,
+  width    = 8, height = 5, dpi = 300
+)
+
+ggsave(
+  filename = here::here("Output", "Week3", "upset_plot.png"),
+  plot     = upset_plot,
+  width    = 10, height = 6, dpi = 300
+)
+
+gtsave(
+  diet_freq_tbl,
+  filename = here::here("Output", "Week3", "diet_freq_tbl.png")
+)
+
+gtsave(
+  final_tbl,
+  filename = here::here("Output", "Week3", "final_tbl.png")
+)
+
+```
+
